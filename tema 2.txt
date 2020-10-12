@@ -1,0 +1,80 @@
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+void adc_init()
+{
+  ADCSRA |= ((1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0));
+  ADCSRA |= (1 << ADEN); //enable ADC
+  ADMUX |= (1 << REFS0);
+  ADCSRA |= (1 << ADSC); //ADC start conversion
+}
+
+int read_adc(int channel)
+{
+  DDRC&=~(1<<channel);
+  ADMUX &= ~(1 << channel);
+  ADMUX |= channel;//select chanel AO to A5
+  ADCSRA |= (1 << ADSC); //start conversion
+  while (ADCSRA & (1 << ADSC)); //wait while adc conversion are not updated
+  return ADCW; //read and return
+}
+
+int get_temp_c_x10(int channel){
+	long sum_var=0;
+	for(int i=0;i<50;i++){
+		sum_var+=read_adc(channel)*32-5000;
+	}
+	int temp_c=(sum_var/50)/10;
+	return temp_c;
+}
+int main()
+{ 
+ DDRB |= 1 << PB5; 
+ OCR1A = 62500;
+ lcd.begin(16, 2);
+ adc_init();
+ TCCR1B |= (1 << WGM12) | (1 << CS12);
+ TIMSK1 |= (1 << OCIE1A);
+ sei();
+  
+
+ while(1)
+ {
+   volatile int temp=get_temp_c_x10(1);
+   lcd.setCursor(0,1);
+   lcd.print("                      ");
+   lcd.setCursor(0,1);
+   lcd.print(temp);
+   delay(10);
+ }
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+  static int ora=23, minut=59, secunda=55;
+  lcd.setCursor(0,0);
+  lcd.print("                      ");
+  lcd.setCursor(0,0);
+  lcd.print("Ora ");
+  
+  lcd.print(ora);
+  lcd.print(":");
+  
+  lcd.print(minut);
+  lcd.print(":");
+  
+  lcd.print(secunda);
+  
+  secunda++;
+  if(secunda==60){
+  	minut++;
+    secunda=0;
+    if(minut==60){
+      ora++;
+      minut=0;
+      if(ora==24)
+        ora=0;
+    }
+  }
+}
